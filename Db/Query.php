@@ -3,6 +3,13 @@
 /**
  * Brvr Library
  *
+ * LICENSE
+ *
+ * This source file is subject to the new BSD license that is bundled
+ * with this package in the file LICENSE.txt.
+ * If you did not receive a copy of the license send an email to
+ * andrew.bates@cantab.net so we can send you a copy immediately.
+ *
  * @author Andrew Bates <andrew.bates@cantab.net>
  * @version 0.1
  * @category Brvr
@@ -135,6 +142,8 @@ abstract class Brvr_Db_Query
     
     /**
      * Execute prepared statement
+     *
+     * @return boolean true on success, false on failure
      */
     public function execute()
     {
@@ -215,8 +224,8 @@ abstract class Brvr_Db_Query
      * operate on one table
      *
      * @param string $tableName Name of the table
-     * @return object Brvr_Db_Query_Insert_Exception
-     * @return object Brvr_Db_Query_Insert
+     * @throws object Brvr_Db_Query_Exception
+     * @return object Brvr_Db_Query
      */
     protected function _setTable($tableName)
     {
@@ -291,6 +300,7 @@ abstract class Brvr_Db_Query
      *     required only if $whereCondition is a string. Its is passed to the
      *     constructor for Brvr_Db_Query_WhereCondition. See the relevant class
      *     code for more information
+     * @return Brvr_Db_Query
      */
     protected function _setWhereCondition($target, 
                                           $whereCondition,
@@ -336,7 +346,7 @@ abstract class Brvr_Db_Query
      *     function with which to sort by
      * @param boolean $sort true, the default represents ASC whilst false adds
      *     DESC
-     * @return Brvr_Db_Query_Abstract
+     * @return Brvr_Db_Query
      */
     protected function _addSortClause($targetClause, 
                                       $columnOrExpr,
@@ -383,7 +393,7 @@ abstract class Brvr_Db_Query
      *     be equal to either 'LIMIT_COUNT' or 'LIMIT_OFFSET'
      * @param int $limitInteger Value to be set to the limit clause
      * @throws Brvr_Db_Query_Exception
-     * @return Brvr_Db_Query_Abstract
+     * @return Brvr_Db_Query
      */
     protected function _setLimitClause($target, $limitInteger)
     {
@@ -431,6 +441,7 @@ abstract class Brvr_Db_Query
      * @param integer $length Length of the data type. To indicate that a
      *     parameter is an OUT parameter from a stored procedure, you must
      *     explicitly set the length. 
+     * @return Brvr_Db_Query
      */
     protected function _bindParam($parameter,
                                   &$variable, 
@@ -476,6 +487,7 @@ abstract class Brvr_Db_Query
      * @param mixed $variable The value to bind to the parameter
      * @param integer $dataType Explicit data type for the parameter using the
      *     PDO::PARAM_* constants
+     * @return Brvr_Db_Query
      */
     protected function _bindValue($parameter, 
                                   $value,
