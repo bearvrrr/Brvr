@@ -1,0 +1,9 @@
+Brvr
+
+Brvr is a collection of PHP classes designed to work with Zend 
+Framework.
+
+To use this all that is required is that the Zend_* classes are in PHP's
+include path.
+
+
