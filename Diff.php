@@ -1,39 +1,47 @@
 <?php
+
 /**
- * FINE granularity DIFF
+ * Brvr Library
  *
- * Computes a set of instructions to convert the content of
- * one string into another.
+ * LICENSE
  *
- * Copyright (c) 2011 Raymond Hill (http://raymondhill.net/blog/?p=441)
+ * This source file is subject to the new BSD license that is bundled
+ * with this package in the file LICENSE.txt.
+ * If you did not receive a copy of the license send an email to
+ * andrew.bates@cantab.net so we can send you a copy immediately.
  *
- * Licensed under The MIT License
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- * @copyright Copyright 2011 (c) Raymond Hill (http://raymondhill.net/blog/?p=441)
- * @link http://www.raymondhill.net/finediff/
- * @version 0.6
- * @license MIT License (http://www.opensource.org/licenses/mit-license.php)
+ * @copyright Copyright 2011 (c) Andrew Bates <andrew.bates@cantab.net>
+ * @version 0.1
+ * @category Brvr
+ * @package Brvr_Diff
  */
 
 /**
+ * @see Brvr_Diff_Op_Copy
+ */
+require_once 'Brvr/Diff/Op/Copy.php';
+
+/**
+ * @see Brvr_Diff_Op_Delete
+ */
+require_once 'Brvr/Diff/Op/Delete.php';
+
+/**
+ * @see Brvr_Diff_Op_Insert
+ */
+require_once 'Brvr/Diff/Op/Insert.php';
+
+/**
+ * @see Brvr_Diff_Op_Replace
+ */
+require_once 'Brvr/Diff/Op/Replace.php';
+
+/**
+ * Fine granularity string DIFFing
+ *
+ * Largely code from fineDiff {@link http://www.raymondhill.net/finediff/}
+ * ((c) Raymond Hill)
+ * 
  * Usage (simplest):
  *
  *   include 'Brvr/Diff.php';
@@ -54,9 +62,7 @@
  *   $toText = Brvr_Diff_Render_Text::renderForward($fromText, $opcodes);
  *
  *   ...
- */
-
-/**
+ *
  * Persisted opcodes (string) are a sequence of atomic opcode.
  * A single opcode can be one of the following:
  *   c | c{n} | d:{c} | d{n}:{s} | i:{c} | i{length}:{s}
@@ -70,15 +76,10 @@
  * These differ from the fineDiff class opcodes in that the delete opcodes
  * specify the string deleted so that opcodes can be used to roll back changes
  * from a newer version of a string to the preceeding newer version
- */
-
-/**
- * String diffing class
  *
- *
- * @TODO: Document
- * @todo license
- * @todo packaging information
+ * @category Brvr
+ * @package Brvr_Diff
+ * @todo test
  */
 class Brvr_Diff
 {
@@ -161,7 +162,7 @@ class Brvr_Diff
         $toText = '',
         $granularityStack = null
     ) {
-        if (is_string($granularityStack) {
+        if (is_string($granularityStack)) {
             $this->_granularityStack = array($granularityStack);
         }
         elseif (is_array($granularityStack) && !empty($granularityStack)) {
@@ -193,7 +194,7 @@ class Brvr_Diff
      */
     public function getGranularity()
     {
-        return $this->_granularity;
+        return $this->_granularityStack;
     }
     
     /**
@@ -227,7 +228,7 @@ class Brvr_Diff
      */
     public static function diff($from, $to, $granularityStack = null)
     {
-        $diff = new Brvr_Diff($from, $to, $granularityStack = null);
+        $diff = new Brvr_Diff($from, $to, $granularityStack);
         return $diff->getOpcodes();
     }
     
@@ -275,6 +276,7 @@ class Brvr_Diff
             }
             // fuse copy ops whenever possible
             elseif ($fragmentEdit instanceof Brvr_Diff_Op_Copy &&
+                    count($edits) > 1 &&
                     $edits[count($edits)-1] instanceof Brvr_Diff_Op_Copy
             ) {
                 $edits[count($edits)-1]->increase(
@@ -512,7 +514,11 @@ class Brvr_Diff
             else {
                 $result[$fromSegmentStart * 4 ]
                     = new Brvr_Diff_Op_Replace(
-                        $fromSegmentLength,
+                        substr(
+                            $fromText,
+                            $fromSegmentStart,
+                            $fromSegmentLength
+                            ),
                         substr($toText, $toSegmentStart, $toSegmentLength)
                         );
             }
@@ -562,7 +568,13 @@ class Brvr_Diff
             if (!$fromSegmentLen || !$toSegmentLen) {
                 if ($fromSegmentLen) {
                     $result[$fromSegmentStart * 4 + 0]
-                        = new Brvr_Diff_Op_Delete($fromSegmentLen);
+                        = new Brvr_Diff_Op_Delete(
+                            substr(
+                                $fromText,
+                                $fromSegmentStart,
+                                $fromSegmentLen
+                                )
+                            );
                 }
                 elseif ($toSegmentLen) {
                     $result[$fromSegmentStart * 4 + 1]
@@ -600,7 +612,7 @@ class Brvr_Diff
                                                 $copyLen
                                                 )
                                             );
-                        if ($fromCopyStart !== false  {
+                        if ($fromCopyStart !== false)  {
                             $fromCopyStart += $fromSegmentStart;
                             break 2;
                         }
@@ -675,7 +687,7 @@ class Brvr_Diff
             else {
                 $result[$fromSegmentStart * 4]
                     = new Brvr_Diff_Op_Replace(
-                        $fromSegmentLen,
+                        substr($fromText, $fromSegmentStart, $fromSegmentLen),
                         substr($toText, $toSegmentStart, $toSegmentLen)
                         );
             }

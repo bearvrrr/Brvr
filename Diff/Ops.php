@@ -2,6 +2,18 @@
 
 /**
  * Brvr Library
+ *
+ * LICENSE
+ *
+ * This source file is subject to the new BSD license that is bundled
+ * with this package in the file LICENSE.txt.
+ * If you did not receive a copy of the license send an email to
+ * andrew.bates@cantab.net so we can send you a copy immediately.
+ *
+ * @copyright Copyright 2011 (c) Andrew Bates <andrew.bates@cantab.net>
+ * @version 0.1
+ * @category Brvr
+ * @package Brvr_Diff
  */
 
 /**
@@ -19,6 +31,14 @@ require_once 'Brvr/Diff/Op/Delete.php';
  */
 require_once 'Brvr/Diff/Op/Insert.php';
 
+/**
+ * Iterable collection of opcode objects
+ *
+ * The opcodes objects are derived from parsing an opcode string
+ *
+ * @category Brvr
+ * @package Brvr_Diff
+ */
 class Brvr_Diff_Ops implements IteratorAggregate
 {
     /**
@@ -48,7 +68,7 @@ class Brvr_Diff_Ops implements IteratorAggregate
             require_once 'Brvr/Diff/Ops/Exception.php';
             throw new Brvr_Diff_Ops_Exception('Opcodes supplied are invalid');
         }
-        $this->_ops = $ops;
+        $this->_ops     = $ops;
         $this->_opcodes = $opcodes;
     }
     

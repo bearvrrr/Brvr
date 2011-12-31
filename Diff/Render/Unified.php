@@ -2,6 +2,19 @@
 
 /**
  * Brvr Library
+ *
+ * LICENSE
+ *
+ * This source file is subject to the new BSD license that is bundled
+ * with this package in the file LICENSE.txt.
+ * If you did not receive a copy of the license send an email to
+ * andrew.bates@cantab.net so we can send you a copy immediately.
+ *
+ * @copyright Copyright 2011 (c) Andrew Bates <andrew.bates@cantab.net>
+ * @version 0.1
+ * @category Brvr
+ * @package Brvr_Diff
+ * @subpackage Brvr_Diff_Render
  */
 
 /**
@@ -20,14 +33,34 @@ require_once 'Brvr/Diff/Ops.php';
 require_once 'Brvr/Diff/Render/Text.php';
 
 /**
- * Diffirent diffing paradim makes it extremely hard to render this. Use case
- * is just for fun?
- *
- * @todo finish this docblock
- * @todo unit test
- * @link http://www.gnu.org/software/diffutils/manual/html_node/Unified-Format.html
+ * @see Brvr_Diff_Render_Abstract
  */
-class Brvr_Diff_Render_Unified extends Brvr_Diff_Render_Abstract
+require_once 'Brvr/Diff/Render/Abstract.php';
+
+/**
+ * @see Brvr_Diff_Render_Interface
+ */
+require_once 'Brvr/Diff/Render/Interface.php';
+
+/**
+ * Show changes between two strings using the unified type output used by the
+ * GNU diff program
+ *
+ * This class produces an output for a different diffing paradigm. Due to
+ * not all information required for this not being stored by the opcodes the
+ * orginal strings must be reconstructed. Thus this is pretty inefficient.
+ *
+ * @link http://www.gnu.org/software/diffutils/manual/html_node/Unified-Format.html
+ *
+ * For usage {@see Brvr_Diff}
+ *
+ * @category Brvr
+ * @package Brvr_Diff
+ * @subpackage Brvr_Diff_Render
+ */
+class Brvr_Diff_Render_Unified 
+    extends Brvr_Diff_Render_Abstract
+    implements Brvr_Diff_Render_Interface
 {
     /**
      * Convert older string ('from' string') to unified format hunks using
@@ -44,34 +77,42 @@ class Brvr_Diff_Render_Unified extends Brvr_Diff_Render_Abstract
          * include that a delete op will never follow an insert op and that no
          * two consecutive ops will be of the same class.
          */
-        $source = $this->getSource();
-        $opRender = new Brvr_Diff_Render_Text($source(), $this->getOpcodes());
-        $dest = $opRender->render();
-        
+        if ($this->_direction) {
+            $source = $this->getSource();
+            $dest   = Brvr_Diff_Render_Text::renderForward($source, $opcodes);
+        } else {
+            $dest   = $this->getSource();
+            $source = Brvr_Diff_Render_Text::renderBackward($dest, $opcodes);
+        }
         $diff = new Brvr_Diff($source, $dest, Brvr_Diff::$characterGranularity);
+
         return $this->opsToUnified($source, $diff->getOpcodes());
     }
     
     /**
-     * Convert newer string ('to' string') to unified format hunks using opcodes
+     * Render string in a 'forward' direction using opcodes
      *
+     * @param string $source Source text to generate output from
+     * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public function reverseRender()
+    public static renderForward($source, $opcodes)
     {
-        /*
-         * Need to ensure that ops are character granularity
-         *
-         * Doing this also provides some guaruntees for the copy ops. These
-         * include that a delete op will never follow an insert op and that no
-         * two consecutive ops will be of the same class.
-         */
-        $source = $this->getSource();
-        $opRender = new Brvr_Diff_Render_Text($source(), $this->getOpcodes());
-        $dest = $opRender->reverseRender();
-        
-        $diff = new Brvr_Diff($dest, $source, Brvr_Diff::$characterGranularity);
-        return $this->opsToUnified($dest, $diff->getOpcodes());
+        $render = new Brvr_Diff_Render_Unified($source, $opcodes);
+        return $render->render();
+    }
+    
+    /**
+     * Render string in a 'backward' direction using opcodes
+     *
+     * @param string $source Source text to generate output from
+     * @param string $opcodes Opcodes to apply to $source
+     * @return string
+     */
+    public static renderBackward($source, $opcodes)
+    {
+        $render = new Brvr_Diff_Render_Unified($source, $opcodes, false);
+        return $render->render();
     }
     
     /**
@@ -377,4 +418,4 @@ class Brvr_Diff_Render_Unified extends Brvr_Diff_Render_Abstract
     {
         return implode("\n", $this->_hunks);
     }
-} // class Brvr_Diff_Render_Text
+} // class Brvr_Diff_Render_Unified

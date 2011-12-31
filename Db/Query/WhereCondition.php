@@ -9,7 +9,7 @@
  * If you did not receive a copy of the license send an email to
  * andrew.bates@cantab.net so we can send you a copy immediately.
  *
- * @author Andrew Bates <andrew.bates@cantab.net>
+ * @copyright Copyright 2011 (c) Andrew Bates <andrew.bates@cantab.net>
  * @version 0.1
  * @category Brvr
  * @package Brvr_Db
