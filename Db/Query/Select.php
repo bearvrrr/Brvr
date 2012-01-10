@@ -220,6 +220,28 @@ class Brvr_Db_Query_Select extends Brvr_Db_Query
     }
     
     /**
+     * Add clause to top level where condition
+     *
+     * @param string|Brvr_Db_Query_WhereCondition $whereCondition Value for
+     *     the WHERE clause
+     * @param string If a string is passed to $whereCondition then
+     *     $conditionGlue is passed to the constructor of the
+     *     Brvr_Db_Query_WhereCondition
+     * @return Brvr_Db_Query_Select
+     */
+    public function addWhere($whereCondition, $conditionGlue = null)
+    {
+        $where = $this->getWhere();
+        if ($where === false) {
+            return $this->setWhere($whereCondition, $conditionGlue);
+        }
+        if ($conditionGlue !== null && $conditionGlue !== $where->getType()) {
+            $this->setWhere($where, $conditionGlue);
+        }
+        $this->getWhere()->addWhereCondition($whereCondition);
+        return $this;
+    }
+    /**
      * Add column to the GROUP BY clause
      *
      * @param string $columnOrExpr The column name to group by or an expression/

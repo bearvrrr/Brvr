@@ -117,6 +117,14 @@ class Brvr_Db_Query_Insert extends Brvr_Db_Query_AlterRowAbstract
     }
     
     /**
+     * Returns the ID of the last inserted row or sequence value
+     * @return int
+     */
+    public function lastInsertId()
+    {
+        return $this->_adapter->lastInsertId();
+    }
+    /**
      * Protected/Private Methods
      */
     
