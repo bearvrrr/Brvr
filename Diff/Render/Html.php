@@ -57,7 +57,7 @@ class Brvr_Diff_Render_Html
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderForward($source, $opcodes)
+    public static function renderForward($source, $opcodes)
     {
         $render = new Brvr_Diff_Render_Html($source, $opcodes);
         return $render->render();
@@ -70,7 +70,7 @@ class Brvr_Diff_Render_Html
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderBackward($source, $opcodes)
+    public static function renderBackward($source, $opcodes)
     {
         $render = new Brvr_Diff_Render_Html($source, $opcodes, false);
         return $render->render();
@@ -99,7 +99,7 @@ class Brvr_Diff_Render_Html
                                     $op->getFromLen()
                                     )
                                 );
-                $sourceOffset += $op->getFromLen;
+                $sourceOffset += $op->getFromLen();
             }
             elseif ($op instanceof Brvr_Diff_Op_Delete) {
                 if ($forward) {
@@ -113,7 +113,7 @@ class Brvr_Diff_Render_Html
                     $sourceOffset += $op->getFromLen();
                 }
                 else {
-                    $rendered .= $this->insertTags($op->getText());
+                    $rendered .= $this->deleteTags($op->getText());
                 }
             }
             else /* if ($op instanceof Brvr_Diff_Op_Insert) */ {
@@ -121,11 +121,11 @@ class Brvr_Diff_Render_Html
                     $rendered .= $this->insertTags($op->getText());
                 }
                 else {
-                    $rendered .= $this->deleteTags(
+                    $rendered .= $this->insertTags(
                                             substr(
                                                 $source,
                                                 $sourceOffset,
-                                                $op->getFromLen()
+                                                $op->getToLen()
                                                 )
                                             );
                     $sourceOffset += $op->getToLen();
@@ -152,7 +152,7 @@ class Brvr_Diff_Render_Html
      * @param string $string To tag
      * @return string
      */
-    protected function insertTags(4string)
+    protected function insertTags($string)
     {
         return '<ins>' . htmlentities($string) . '</ins>';
     }

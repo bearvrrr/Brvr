@@ -57,7 +57,7 @@ class Brvr_Diff_Render_Text
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderForward($source, $opcodes)
+    public static function renderForward($source, $opcodes)
     {
         $render = new Brvr_Diff_Render_Text($source, $opcodes);
         return $render->render();
@@ -70,7 +70,7 @@ class Brvr_Diff_Render_Text
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderBackward($source, $opcodes)
+    public static function renderBackward($source, $opcodes)
     {
         $render = new Brvr_Diff_Render_Text($source, $opcodes, false);
         return $render->render();
@@ -93,7 +93,7 @@ class Brvr_Diff_Render_Text
         foreach ($this->_ops as $op) {
             if ($op instanceof Brvr_Diff_Op_Copy) {
                 $rendered .= substr($source, $sourceOffset, $op->getFromLen());
-                $sourceOffset += $op->getFromLen;
+                $sourceOffset += $op->getFromLen();
             }
             elseif ($op instanceof Brvr_Diff_Op_Delete) {
                 if ($forward) {

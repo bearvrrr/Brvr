@@ -67,7 +67,7 @@ interface Brvr_Diff_Render_Interface
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderForward($source, $opcodes);
+    public static function renderForward($source, $opcodes);
     
     /**
      * Render string in a 'backward' direction using opcodes
@@ -76,5 +76,5 @@ interface Brvr_Diff_Render_Interface
      * @param string $opcodes Opcodes to apply to $source
      * @return string
      */
-    public static renderBackward($source, $opcodes);
+    public static function renderBackward($source, $opcodes);
 }

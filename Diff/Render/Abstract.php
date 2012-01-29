@@ -67,7 +67,7 @@ abstract class Brvr_Diff_Render_Abstract
      *     string to render 'forwards' or false is the 'newer' string to render
      *     backwards
      */
-    public function __construct($source, $opcodes, $forward = true);
+    public function __construct($source, $opcodes, $forward = true)
     {
         $this->_source = $source;
         $this->_ops    = new Brvr_Diff_Ops($opcodes);

@@ -32,11 +32,6 @@ require_once 'Brvr/Diff/Op/Delete.php';
 require_once 'Brvr/Diff/Op/Insert.php';
 
 /**
- * @see Brvr_Diff_Op_Replace
- */
-require_once 'Brvr/Diff/Op/Replace.php';
-
-/**
  * Fine granularity string DIFFing
  *
  * Largely code from fineDiff {@link http://www.raymondhill.net/finediff/}
@@ -240,471 +235,167 @@ class Brvr_Diff
      * This is the recursive function which is responsible for
      * handling/increasing granularity.
      *
-     * Incrementally increasing the granularity is key to compute the
-     * overall diff in a very efficient way.
-     *
      * @param string $fromText
      * @param string $toText
      * @param array $granularityStack
      */
-    private function processGranularity(
-        $fromSegment,
-        $toSegment,
-        $granularityStack
-        )
+    private function processGranularity($from, $to, $granularityStack)
     {
-        $fromOffset = 0;
-        $edits = array();
         $delimiters = array_shift($granularityStack);
         $hasNextStage = !empty($granularityStack);
-        foreach (
-            self::doFragmentDiff($fromSegment, $toSegment, $delimiters)
-            as $fragmentEdit
-        ) {
-            // increase granularity
-            if ($fragmentEdit instanceof Brvr_Diff_Op_Replace && 
-                $hasNextStage
-            ) {
-                $edits = array_merge(
-                    $edits,
-                    $this->processGranularity(
-                        $fragmentEdit->getFromText(),
-                        $fragmentEdit->getToText(),
-                        $granularityStack
-                        )
-                    );
-            }
-            // fuse copy ops whenever possible
-            elseif ($fragmentEdit instanceof Brvr_Diff_Op_Copy &&
-                    count($edits) > 1 &&
-                    $edits[count($edits)-1] instanceof Brvr_Diff_Op_Copy
-            ) {
-                $edits[count($edits)-1]->increase(
-                                                $fragmentEdit->getFromLen());
-            }
-            else {
-                $edits[] = $fragmentEdit;
-            }
-            $fromOffset += $fragmentEdit->getFromLen();
-        }
-        return $edits;
-    }
-
-    /**
-     * Perform diff at granularity determined by delimiters
-     *
-     * This is the core algorithm which actually perform the diff itself,
-     * fragmenting the strings as per specified delimiters.
-     *
-     * This function is naturally recursive, however for performance purpose
-     * a local job queue is used instead of outright recursivity.
-     *
-     * This is a long function that may benefit from refactoring, however
-     * hopefully the comments are informative
-     *
-     * @param string $fromText
-     * @param string $toText
-     * @param string $delimiters Boundary characters for fragments
-     */
-    private static function doFragmentDiff($fromText, $toText, $delimiters)
-    {
-        /*
-         * Empty delimiter means character-level diffing.
-         * In such case, use code path optimized for character-level
-         * diffing.
-         */
-        if (empty($delimiters)) {
-            return self::doCharDiff($fromText, $toText);
-        }
-
-        $result = array();
-
-        $fromTextLen = strlen($fromText);
-        $toTextLen = strlen($toText);
-        $fromFragments = self::extractFragments($fromText, $delimiters);
-        $toFragments = self::extractFragments($toText, $delimiters);
+        $old = $this->extractFragments($from, $delimiters);
+        $new = $this->extractFragments($to,   $delimiters);
         
-        $jobs = array(array(0, $fromTextLen, 0, $toTextLen));
-        
-        $cachedArrayKeys = array();
-        
-        while ($job = array_pop($jobs)) {
-            list(
-                $fromSegmentStart,
-                $fromSegmentEnd,
-                $toSegmentStart,
-                $toSegmentEnd
-                ) = $job;
-            
-            /*
-             * Catch easy cases: if either the from or to segment are empty then
-             * it will be an insert or delete operation respectively. If both
-             * are empty then just skip to the next job
-             */
-            $fromSegmentLength = $fromSegmentEnd - $fromSegmentStart;
-            $toSegmentLength = $toSegmentEnd - $toSegmentStart;
-            if (!$fromSegmentLength || !$toSegmentLength) {
-                if ($fromSegmentLength) {
-                    $result[$fromSegmentStart * 4]
-                        = new Brvr_Diff_Op_Delete(
-                            substr(
-                                $fromText,
-                                $fromSegmentStart,
-                                $fromSegmentLength
-                                )
-                            );
-                }
-                elseif ($toSegmentLength) {
-                    $result[$fromSegmentStart * 4 + 1]
-                        = new Brvr_Diff_Op_Insert(
-                            substr($toText, $toSegmentStart, $toSegmentLength)
-                            );
-                }
-                continue;
-            }
-            
-            /*
-             * Only copy or replace ops possible. Determine which by finding
-             * longest copy operation for the current segments
-             */
-            $bestCopyLength = 0;
-            $fromBaseFragmentIndex = $fromSegmentStart;
-            $cachedArrayKeysForCurrentSegment = array();
-            
-            while ( $fromBaseFragmentIndex < $fromSegmentEnd ) {
-                $fromBaseFragment = $fromFragments[$fromBaseFragmentIndex];
-                $fromBaseFragmentLength = strlen($fromBaseFragment);
-                
-                /*
-                 * Get the character indices of all those 'to fragments' that
-                 * match the current from fragment
-                 */
-                // performance boost: cache array keys
-                if (!isset(
-                        $cachedArrayKeysForCurrentSegment[$fromBaseFragment])
-                ) {
-                    if (!isset($cachedArrayKeys[$fromBaseFragment])) {
-                        $toAllFragmentIndices
-                            = $cachedArrayKeys[$fromBaseFragment]
-                            = array_keys($toFragments, $fromBaseFragment, true);
-                    }
-                    else {
-                        $toAllFragmentIndices
-                            = $cachedArrayKeys[$fromBaseFragment];
-                    }
-                    
-                    // get only indices which falls within current segment
-                    if ( $toSegmentStart > 0 || $toSegmentEnd < $toTextLen ) {
-                        $toFragmentIndices = array();
-                        foreach ($toAllFragmentIndices as $toFragmentIndex) {
-                            if ( $toFragmentIndex < $toSegmentStart ) {
-                                continue;
-                            }
-                            if ( $toFragmentIndex >= $toSegmentEnd ) { 
-                                break;
-                            }
-                            $toFragmentIndices[] = $toFragmentIndex;
-                        }
-                        $cachedArrayKeysForCurrentSegment[$fromBaseFragment]
-                                                        = $toFragmentIndices;
-                    }
-                    else {
-                        $toFragmentIndices = $toAllFragmentIndices;
-                    }
+        $ops = array();
+        foreach (self::arrayDiff($old, $new) as $fragment) {
+            if (is_array($fragment)) {
+                $oldString = implode('', $fragment['d']);
+                $newString = implode('', $fragment['i']);
+                if ($hasNextStage) {
+                    $ops = $this->appendOps(
+                                        $ops,
+                                        $this->processGranularity(
+                                                    $oldString,
+                                                    $newString,
+                                                    $granularityStack
+                                                    )
+                                        );
                 }
                 else {
-                    $toFragmentIndices
-                        = $cachedArrayKeysForCurrentSegment[$fromBaseFragment];
-                }
-                
-                /*
-                 * $toFragmentIndices will be empty if no fragments in the
-                 * current segment match (i.e. no execution of foreach block)
-                 */
-                foreach ($toFragmentIndices as $toBaseFragmentIndex) {
-                    $fragmentIndexOffset = $fromBaseFragmentLength;
-                    // iterate until no more match
-                    for (;;) {
-                        /*
-                         * Check whether the end of the to or from segment has
-                         * been reached by comparing index for the next fragment
-                         * to the index of the segment end
-                         */
-                        $fragmentFromIndex
-                                = $fromBaseFragmentIndex + $fragmentIndexOffset;
-                        if ($fragmentFromIndex >= $fromSegmentEnd) {
-                            break;
-                        }
-                        $fragmentToIndex
-                                = $toBaseFragmentIndex + $fragmentIndexOffset;
-                        if ($fragmentToIndex >= $toSegmentEnd) {
-                            break;
-                        }
-                        
-                        /*
-                         * Check whether next from and to fragments match
-                         */
-                        if ($fromFragments[$fragmentFromIndex] !==
-                                            $toFragments[$fragmentToIndex]
-                        ) {
-                            break;
-                        }
-                        
-                        /*
-                         * Fragments match so get length of current matching
-                         * series of fragments
-                         */
-                        $fragmentLength
-                                = strlen($fromFragments[$fragmentFromIndex]);
-                        $fragmentIndexOffset += $fragmentLength;
+                    if (!empty($oldString)) {
+                        $ops[] = new Brvr_Diff_Op_Delete($oldString);
                     }
-                    
-                    /*
-                     * Assumption is that longest matching portion of the string
-                     * is the part that has not been changed between the from
-                     * and to strings
-                     */
-                    if ($fragmentIndexOffset > $bestCopyLength) {
-                        $bestCopyLength = $fragmentIndexOffset;
-                        $bestFromStart = $fromBaseFragmentIndex;
-                        $bestToStart = $toBaseFragmentIndex;
+                    if (!empty($newString)) {
+                        $ops[] = new Brvr_Diff_Op_Insert($newString);
                     }
                 }
-                
-                $fromBaseFragmentIndex += strlen($fromBaseFragment);
-                
-                /*
-                 * no point to keep looking if what is left is less than
-                 * current best match
-                 */
-                if ($bestCopyLength >= $fromSegmentEnd - $fromBaseFragmentIndex
-                ) {
-                    break;
-                }
-            } // end of while to find $bestCopyLength
-
-            if ($bestCopyLength) {
-                /*
-                 * Job to diff segment between current segment start and start
-                 * of longest found matching string
-                 */
-                $jobs[] = array(
-                    $fromSegmentStart,
-                    $bestFromStart,
-                    $toSegmentStart,
-                    $bestToStart
-                    );
-                $result[$bestFromStart * 4 + 2]
-                                    = new Brvr_Diff_Op_Copy($bestCopyLength);
-                /*
-                 * Job to diff segment after current found longest matching
-                 * string and end of current segment
-                 */
-                $jobs[] = array(
-                    $bestFromStart + $bestCopyLength,
-                    $fromSegmentEnd,
-                    $bestToStart + $bestCopyLength,
-                    $toSegmentEnd
-                    );
-                }
-            /*
-             * If there are no matching segments then a replace operation is
-             * required
-             */
-            else {
-                $result[$fromSegmentStart * 4 ]
-                    = new Brvr_Diff_Op_Replace(
-                        substr(
-                            $fromText,
-                            $fromSegmentStart,
-                            $fromSegmentLength
-                            ),
-                        substr($toText, $toSegmentStart, $toSegmentLength)
-                        );
             }
-        } // end of jobs while loop
-        ksort($result, SORT_NUMERIC);
-        return array_values($result);
+            else {
+                if (empty($ops)) {
+                    $ops[] = new Brvr_Diff_Op_Copy(strlen($fragment));
+                }
+                else {
+                    $lastOp = $ops[count($ops) - 1];
+                    if ($lastOp instanceof Brvr_Diff_Op_Copy) {
+                        $lastOp->increase(strlen($fragment));
+                    }
+                    else {
+                        $ops[] = new Brvr_Diff_Op_Copy(strlen($fragment));
+                    }
+                }
+            }
+        }
+        return $ops;
     }
-
+    
     /**
-    * Perform a character-level diff.
-    *
-    * The algorithm is quite similar to doFragmentDiff(), except that
-    * the code path is optimized for character-level diff -- strpos() is
-    * used to find out the longest common subequence of characters.
-    *
-    * We try to find a match using the longest possible subsequence, which
-    * is at most the length of the shortest of the two strings, then incrementally
-    * reduce the size until a match is found.
-    *
-    * I still need to study more the performance of this function. It
-    * appears that for long strings, the generic doFragmentDiff() is more
-    * performant. For word-sized strings, doCharDiff() is somewhat more
-    * performant.
-    *
-    * @param string $fromText
-    * @param string $toText
-    * @return array
-    */
-    private static function doCharDiff($fromText, $toText) {
-        $result = array();
-        $jobs = array(array(0, strlen($fromText), 0, strlen($toText)));
-        while ( $job = array_pop($jobs) ) {
-            list(
-                $fromSegmentStart,
-                $fromSegmentEnd,
-                $toSegmentStart,
-                $toSegmentEnd
-                ) = $job;
-            
-            /*
-             * Catch easy cases: if either the from or to segment are empty then
-             * it will be an insert or delete operation respectively. If both
-             * are empty then just skip to the next job
-             */
-            $fromSegmentLen = $fromSegmentEnd - $fromSegmentStart;
-            $toSegmentLen = $toSegmentEnd - $toSegmentStart;
-            if (!$fromSegmentLen || !$toSegmentLen) {
-                if ($fromSegmentLen) {
-                    $result[$fromSegmentStart * 4 + 0]
-                        = new Brvr_Diff_Op_Delete(
-                            substr(
-                                $fromText,
-                                $fromSegmentStart,
-                                $fromSegmentLen
-                                )
-                            );
-                }
-                elseif ($toSegmentLen) {
-                    $result[$fromSegmentStart * 4 + 1]
-                        = new Brvr_Diff_Op_Insert(
-                            substr($toText, $toSegmentStart, $toSegmentLen)
-                            );
-                }
-                continue;
-            }
-            
-            if ($fromSegmentLen >= $toSegmentLen) {
-                /*
-                 * Start with looking for best possible match then decrease
-                 * length of 'needle' search string until all possible needles
-                 * searched for or a match is found
-                 */
-                $copyLen = $toSegmentLen;
-                while ($copyLen) {
-                    $toCopyStart = $toSegmentStart;
-                    $toCopyStartMax = $toSegmentEnd - $copyLen;
-                    
-                    /*
-                     * Check each possible string of length $copyLen
-                     */
-                    while ($toCopyStart <= $toCopyStartMax) {
-                        $fromCopyStart = strpos(
-                                            substr(
-                                                $fromText, 
-                                                $fromSegmentStart,
-                                                $fromSegmentLen
-                                                ),
-                                            substr(
-                                                $toText,
-                                                $toCopyStart,
-                                                $copyLen
-                                                )
-                                            );
-                        if ($fromCopyStart !== false)  {
-                            $fromCopyStart += $fromSegmentStart;
-                            break 2;
-                        }
-                        $toCopyStart++;
-                    }
-                    $copyLen--;
-                }
-            }
-            else {
-                /*
-                 * Start with looking for best possible match then decrease
-                 * length of 'needle' search string until all possible needles
-                 * searched for or a match is found
-                 */
-                $copyLen = $fromSegmentLen;
-                while ($copyLen) {
-                    $fromCopyStart = $fromSegmentStart;
-                    $fromCopyStartMax = $fromSegmentEnd - $copyLen;
-                    
-                    /*
-                     * Check each possible string of length $copyLen
-                     */
-                    while ($fromCopyStart <= $fromCopyStartMax) {
-                        $toCopyStart = strpos(
-                                            substr(
-                                                $toText,
-                                                $toSegmentStart,
-                                                $toSegmentLen),
-                                            substr($fromText,
-                                                $fromCopyStart,
-                                                $copyLen
-                                                )
-                                            );
-                        if ($toCopyStart !== false) {
-                            $toCopyStart += $toSegmentStart;
-                            break 2;
-                        }
-                        $fromCopyStart++;
-                    }
-                    $copyLen--;
-                }
-            }
-            // match found
-            if ($copyLen) {
-                /*
-                 * Job to diff segment between current segment start and start
-                 * of longest found matching string
-                 */
-                $jobs[] = array(
-                    $fromSegmentStart,
-                    $fromCopyStart,
-                    $toSegmentStart,
-                    $toCopyStart
-                    );
-                $result[$fromCopyStart * 4 + 2]
-                    = new Brvr_Diff_Op_Copy($copyLen);
-                /*
-                 * Job to diff segment after current found longest matching
-                 * string and end of current segment
-                 */
-                $jobs[] = array(
-                    $fromCopyStart + $copyLen,
-                    $fromSegmentEnd,
-                    $toCopyStart + $copyLen,
-                    $toSegmentEnd
-                    );
-                }
-            /*
-             * If there are no matching segments then a replace operation is
-             * required
-             */
-            else {
-                $result[$fromSegmentStart * 4]
-                    = new Brvr_Diff_Op_Replace(
-                        substr($fromText, $fromSegmentStart, $fromSegmentLen),
-                        substr($toText, $toSegmentStart, $toSegmentLen)
-                        );
-            }
-        } // end of jobs while loop
-        ksort($result, SORT_NUMERIC);
-        return array_values($result);
+     * Merge arrays of opcodes
+     *
+     * Adjacent Brvr_Diff_Op_Copy objects will become merged into a single op
+     *
+     * @param array $ops of Brvr_Diff_Op_Interface objects
+     * @param array $opsToAppend of Brvr_Diff_Op_Interface objects
+     * @return array
+     */
+    protected function appendOps($ops, $opsToAppend)
+    {
+        if (empty($ops) || empty($opsToAppend)) {
+            if (!empty($ops)) return $ops;
+            if (!empty($opsToAppend)) return $opsToAppend;
+            return array();
+        }
+        $lastOp          = array_pop($ops);
+        $firstOpToAppend = array_shift($opsToAppend);
+        if ($lastOp instanceof Brvr_Diff_Op_Copy &&
+            $firstOpToAppend instanceof Brvr_Diff_Op_Copy
+        ) {
+            //
+            $lastOp->increase($firstOpToAppend->getFromLen());
+            $ops[] = $lastOp;
+            return array_merge($ops, $opsToAppend);
+        }
+        $ops[] = $lastOp;
+        $ops[] = $firstOpToAppend;
+        return array_merge($ops, $opsToAppend);
     }
-
+    
+    /**
+     * Find the difference between two arrays
+     *
+     * This function is slighty altered version of 'Paul's simple diff
+     * algorithm' {@link https://raw.github.com/paulgb/simplediff/5bfe1d2a8f967c7901ace50f04ac2d9308ed3169/simplediff.php}
+     * which is distributed under the zlib/libpng license (C) 2007. 
+     *
+     * Example input/output:
+     *
+     * $old = array('copy', 'delete', 'copy');
+     * $new = array('copy', 'insert', 'copy');
+     * var_dump($old, $new);
+     * 
+     * Would produce:
+     * array(3) {
+     *   [0]=>
+     *   string(4) "copy"
+     *   [1]=>
+     *   array(2) {
+     *     ["d"]=>
+     *       array(1) {
+     *     [0]=>
+     *     string(6) "delete"
+     *     }
+     *     ["i"]=>
+     *     array(1) {
+     *       [0]=>
+     *       string(6) "insert"
+     *     }
+     *   }
+     *   [2]=>
+     *   string(4) "copy"
+     * }
+     *
+     * @param array $old
+     * @param array $new
+     * @return array
+     */
+    public static function arrayDiff($old, $new)
+    {
+        if (empty($old) && empty($new)) {
+            return array();
+        }
+        $maxlen = 0;
+        $matrix = array();
+        foreach ($old as $oindex => $ovalue) {
+            $nkeys = array_keys($new, $ovalue);
+            foreach ($nkeys as $nindex) {
+                $matrix[$oindex][$nindex] 
+                    = isset($matrix[$oindex - 1][$nindex - 1]) ?
+                                    $matrix[$oindex - 1][$nindex - 1] + 1 : 1;
+                if ($matrix[$oindex][$nindex] > $maxlen) {
+                    $maxlen = $matrix[$oindex][$nindex];
+                    $omax = $oindex + 1 - $maxlen;
+                    $nmax = $nindex + 1 - $maxlen;
+                }
+            }
+        }
+        if ($maxlen == 0) return array(array('d' => $old, 'i' => $new));
+        return array_merge(
+            self::arrayDiff(
+                    array_slice($old, 0, $omax),
+                    array_slice($new, 0, $nmax)
+                    ),
+            array_slice($new, $nmax, $maxlen),
+            self::arrayDiff(
+                array_slice($old, $omax + $maxlen),
+                array_slice($new, $nmax + $maxlen)
+                )
+            );
+    }
+    
     /**
      * Efficiently fragment the text into an array according to specified
      * delimiters.
      *
      * No delimiters means fragment into single character.
-     *
-     * The array indices are the offset of the fragments into the input string.
-     * A sentinel empty fragment is always added at the end. Its index is the
-     * length of the string
      *
      * Careful: No check is performed as to the validity of the
      * delimiters.
@@ -713,12 +404,11 @@ class Brvr_Diff
      * @param string $delimiters characters at which to split the $text
      * @return array
      */
-    private static function extractFragments($text, $delimiters)
+    protected function extractFragments($text, $delimiters)
     {
         // special case: split into characters
-        if ( empty($delimiters) ) {
+        if (empty($delimiters)) {
             $chars = str_split($text, 1);
-            $chars[strlen($text)] = '';
             return $chars;
         }
         $fragments = array();
@@ -729,10 +419,9 @@ class Brvr_Diff
             if ($end === $start) {
                 break;
             }
-            $fragments[$start] = substr($text, $start, $end - $start);
+            $fragments[] = substr($text, $start, $end - $start);
             $start = $end;
         }
-        $fragments[$start] = '';
         return $fragments;
     }
 }
