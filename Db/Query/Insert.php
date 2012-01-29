@@ -124,6 +124,7 @@ class Brvr_Db_Query_Insert extends Brvr_Db_Query_AlterRowAbstract
     {
         return $this->_adapter->lastInsertId();
     }
+    
     /**
      * Protected/Private Methods
      */
